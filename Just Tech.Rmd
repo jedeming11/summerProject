@@ -1,0 +1,127 @@
+---
+title: "project"
+author: "smith arthur q"
+date: "June 24, 2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r read-csv}
+#set.seed(2)
+ks = read.csv("ks18.CSV",header=TRUE,stringsAsFactors = FALSE)
+#datinp = read.table("Rdata.csv", header=TRUE, stringAsFactors=FALSE, as.is = !stringsAsFactors , sep=",")
+#
+#
+# first cleanup - numeric data getting converted to factors!! Bad...#
+#
+#
+ks$goal = as.numeric(ks$goal)
+ks$pledged = as.numeric(ks$pledged)
+ks$backers = as.numeric(ks$backers)   # numeric or character best serve our needs?
+ks$usd.pledged = as.numeric(ks$usd.pledged)
+#ks$deadline = as.Date(ks$deadline, format = "%m/%d/%Y") # convert to date and get rid of time stamp
+#ks$launched = as.Date(ks$launched, format = "%m/%d/%Y")  # convert to date and get rid of time stamp
+
+#summary(pr)  # any weird mean, median?  Data integer, character?  Maybe an outlier?  
+#plot(pr$x5)  # visual for outliers?
+#cor(pr)  # correlation issues?
+#print(pr[100:200,])
+
+```
+
+```{r just-tech}
+#set.seed(2)
+tech = ks[ks$category == 'Technology',]
+techNoID = tech[,-(1:5)] # cut id name cat mcat currency  
+t = techNoID[,-(9:10)] # cut empty columns pledged_real, pledged_goal
+#head(t)
+#summary(t)
+
+```
+
+```{r save-tech-data}
+write.csv(tech, file = "techdata.csv")
+
+```
+
+```{r prep-to-engineer}
+techProjects = dim(t)
+obs = techProjects[1]
+
+#typeof(cleanTech) # what is it?
+#class(cleanTech) # what is it?  
+#storage.mode(cleanTech) # what is it?  
+#length(cleanTech) # how long is it?  
+#dim(cleanTech) # matrix?
+#attributes(cleanTech) # does it have any metadata?
+
+```
+
+```{r add-3-columns-to-engineer}
+#
+# since we are predicting failures, do we need to reverse these?
+#
+believerRatio = rep(1,obs)    # add col for believers per $ (higher ratio means more believers)
+hopeRatio = rep(1,obs)        # add col for pledged $ per goal $ (higher ratio means they are TRUE believers )  
+hopeSlope = rep(1,obs)        # add col for $ per day (higher ratio means hope is going viral) 
+guess = rep(0,obs)            # add col for prediction outcome
+xt = cbind(t,believerRatio,hopeRatio,hopeSlope,guess)   # eXpanded Tech 
+dim(xt)
+class(xt)
+#head(xt)
+
+```
+
+```{r engineer}
+#attributes(q[])
+
+obs = 10
+printit = 'y'
+
+for (i in 1:obs){
+  xt[i, 9] =  xt[i,6]/xt[i,2]             # believerRatio = backers/goal................do more believers/$ matter?  
+  xt[i,10] =  xt[i,8]/xt[i,2]             # hopeRatio = usd.pledged/goal................do "strong" believers/$ matter? 
+  days     = (as.Date(xt[i,1])-as.Date(xt[i,3])) 
+  xt[i,11] =  xt[i,8]/as.numeric(days)    # hopeSlope = usd.pledged/deadline-launched...does "faster" uptake matter?  
+
+  if (printit == 'y'){  
+      message(i)
+      message(' Faith: ', xt[i, 9]*1000)
+      message(' Hope: ' , xt[i,10]*100)
+      message(' Slope: ', xt[i,11]/100)  
+      message(' State: ', xt[i, 5])
+      message(' Days: ' , days)
+      message('   ')
+  } 
+
+}
+
+```
+
+```{r echo=TRUE}
+library(corrplot)
+ce2 = cor(xt)
+corrplot(ce2, order="hclust", method="shade")
+
+```
+
+```{r}
+#
+# predict state as failed (and canceled) or successful
+# 
+
+cor(xt)
+
+
+result = glm(guess~.,xt,family = "binomial")
+
+
+```
+
+
+
