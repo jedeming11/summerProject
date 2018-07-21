@@ -25,7 +25,7 @@ s = read.csv("cleanedData.CSV",header=TRUE,stringsAsFactors = FALSE)
 # should we treat them as failed?
 # should we impute them as successful or failed based on if they met goal
 #
-# A project may be suspended if our Integrity team uncovers,846):
+# A project may be suspended if our Integrity team uncovers:
 # Misrepresentation of support, through self-pledging.
 # Misrepresentation or failure to disclose relevant facts about the project or its creator.
 # creator provides inaccurate or incomplete user information to Kickstarter or one of our partners.
@@ -37,13 +37,12 @@ s = read.csv("cleanedData.CSV",header=TRUE,stringsAsFactors = FALSE)
 # creator repackages a previously-created product, without adding new feature or aims to iterate on the idea in any way.
 # The creator has outstanding fulfillment issues related to a previously successful crowdfunding campaign
 
-barplot(prop.table(table(s$state,exclude=NULL)))
+#barplot(prop.table(table(s$state,exclude=NULL)))
 #
 # relatively few suspended projects (less than one percent = 1,846 out of 376,303)
 #
 
-ss = ks[ks$state == 'successful',]
-#summary(ss)
+ss = s[s$state == 'successful',]
 barplot(prop.table(table(ss$goal,exclude=NULL)))
 barplot(prop.table(table(ss$pledged,exclude=NULL)))
 barplot(prop.table(table(ss$backers,exclude=NULL)))
@@ -53,8 +52,7 @@ barplot(prop.table(table(ss$backers,exclude=NULL)))
 # pledged is right skewed
 # backers is right skewed
 
-fl = ks[ks$state == 'failed',]
-#summary(fl)
+fl = s[s$state == 'failed',]
 barplot(prop.table(table(fl$goal,exclude=NULL)))
 barplot(prop.table(table(fl$pledged,exclude=NULL)))
 barplot(prop.table(table(fl$backers,exclude=NULL)))
@@ -64,8 +62,7 @@ barplot(prop.table(table(fl$backers,exclude=NULL)))
 # pledged is right skewed
 # backers is right skewed
 
-sp = ks[ks$state == 'suspended',]
-#summary(sp)
+sp = s[s$state == 'suspended',]
 barplot(prop.table(table(sp$goal,exclude=NULL)))
 barplot(prop.table(table(sp$pledged,exclude=NULL)))
 barplot(prop.table(table(sp$backers,exclude=NULL)))
@@ -74,6 +71,30 @@ barplot(prop.table(table(sp$backers,exclude=NULL)))
 # goal appears random
 # pledged is right skewed
 # backers is right skewed
+
+message(" successful - goal")
+summary(ss$goal)
+message(" failed - goal")
+summary(fl$goal)
+message(" suspended - goal")
+summary(sp$goal)
+#
+# the mean of goal, for suspendeds is way out of alignment with successful and failed... 
+# but the median is in the bounds of successful and failed...
+
+message(" ")
+message(" ")
+message(" ")
+
+message(" successful - backers")
+summary(ss$backers)
+message(" failed - backers")
+summary(fl$backers)
+message(" suspended - backers")
+summary(sp$backers)
+#
+# suspended values do not fall outside the bounds of successful or failed for any statistic
+#
 
 ```
 
