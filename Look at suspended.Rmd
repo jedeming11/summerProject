@@ -1,0 +1,88 @@
+---
+title: "project"
+author: "smith arthur q"
+date: "July 21, 2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r read-csv}
+#set.seed(2)
+s = read.csv("cleanedData.CSV",header=TRUE,stringsAsFactors = FALSE)
+#
+
+```
+
+```{r prep-to-engineer}
+#
+# we have many "suspended" projects (1,846)  
+# should we delete them?  
+# should we treat them as failed?
+# should we impute them as successful or failed based on if they met goal
+#
+# A project may be suspended if our Integrity team uncovers,846):
+# Misrepresentation of support, through self-pledging.
+# Misrepresentation or failure to disclose relevant facts about the project or its creator.
+# creator provides inaccurate or incomplete user information to Kickstarter or one of our partners.
+# characteristics of creator account overlap with the characteristics of backer accounts that pledged to their project.
+# party related to the creator is posing as an independent, supportive party in project comments or elsewhere.
+# The creator is presenting someone else's work as their own.
+# The creator is offering purchased items, claiming to have made them.
+# The creator or an affiliated service is spamming potential backers with promotional materials.
+# creator repackages a previously-created product, without adding new feature or aims to iterate on the idea in any way.
+# The creator has outstanding fulfillment issues related to a previously successful crowdfunding campaign
+
+barplot(prop.table(table(s$state,exclude=NULL)))
+#
+# relatively few suspended projects (less than one percent = 1,846 out of 376,303)
+#
+
+ss = ks[ks$state == 'successful',]
+#summary(ss)
+barplot(prop.table(table(ss$goal,exclude=NULL)))
+barplot(prop.table(table(ss$pledged,exclude=NULL)))
+barplot(prop.table(table(ss$backers,exclude=NULL)))
+#
+# how successful look overall
+# goal appears to be random
+# pledged is right skewed
+# backers is right skewed
+
+fl = ks[ks$state == 'failed',]
+#summary(fl)
+barplot(prop.table(table(fl$goal,exclude=NULL)))
+barplot(prop.table(table(fl$pledged,exclude=NULL)))
+barplot(prop.table(table(fl$backers,exclude=NULL)))
+#
+# how failed look overall
+# goal appears to be random
+# pledged is right skewed
+# backers is right skewed
+
+sp = ks[ks$state == 'suspended',]
+#summary(sp)
+barplot(prop.table(table(sp$goal,exclude=NULL)))
+barplot(prop.table(table(sp$pledged,exclude=NULL)))
+barplot(prop.table(table(sp$backers,exclude=NULL)))
+#
+# how suspended look overall
+# goal appears random
+# pledged is right skewed
+# backers is right skewed
+
+```
+
+
+
+
+
+
+
+
+
+
