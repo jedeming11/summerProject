@@ -15,6 +15,44 @@ hope_ratio : usd_pledged_real / usd_goal * 100
 dollars_needed_per_day : usd_goal_real / duration
 hope_slope : pledged_dollars_day / dollars_needed_per_day 
 backers_per_day : backers / duration
+launched_year: the year project was launched
+
+Because we had so many features there was a lot of correlation in the data set, so models were run removing highly correlated predictors
+There were a lot of issues becuase of the size of our data set when trying to run repeated 10 fold cv.  It was pretty much impossible unless we let our programs run for 24 + hours.
+
+Models attempted:
+
+KNN: Attempted to use the 'caret' train function on all non-correlated predictors from 2012 - 2017.  I used repeated 10 fold cv ( repeat of 10 times ) this ran for over 24 ours so I cancelled it.  I ran the KNN again on a random sample of only 10000 predictors from our training set and got an optimum k of 5 so reran on the entire training set and then tested 
+
+           testing_y
+knn_pred_y   failed successful
+  failed      54615          1
+  successful     44      35470
+
+Accuracy: 0.99
+Specificity: 0.99
+Sensitivity: 0.99
+
+This is expected seeing as our data has the answers in it.  Obviously if the hope_slope is greater than 1 then the project is successful, same thing for the hope_ratio; if it's greater than 1 then the project will be successful
+
+We need data that exists already at the beginning of the project in order to predict.
+Or we need snapshots of data during the time of the project; i.e. how much was raised after 1 week, 2weeks, etc.... in order to actually run a model on current projects to try and predict
+
+the only data we have that exists at the beginning of the project is Category, duration, and goal
+
+Ran Knn on 2012 - 2017 data ( same as above ) but only using main_category, goal, and duration 
+
+predictedK   failed successful
+  failed      47532      34162
+  successful      0          0
+  
+Accuracy: 0.58
+Sensitivity: 0.00
+Specificity: 0.58
+
+
+
+
 
 
 
