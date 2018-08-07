@@ -1,0 +1,486 @@
+---
+title: "Project Modelling"
+author: "Jennifer Deming"
+date: "July 29, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+**Read in cleaned data file**
+```{r}
+
+ks = read.csv("C:/Users/Jennifer/Documents/SUMMER/project/finalData.csv", header = TRUE, stringsAsFactors = FALSE)
+
+summary(ks)
+head(ks)
+
+# want 4,7:19 for the model
+
+modks = ks[, c(4,7,9:19) ]
+
+summary(modks)
+head(modks)
+
+
+```
+
+
+```{r}
+
+###############################Convert some string columns to numeric and factors
+
+modks$main_category = as.factor(modks$main_category)
+
+modks$believer_ratio = as.numeric(modks$believer_ratio)
+summary(modks$believer_ratio)
+
+modks$hope_ratio = as.numeric(modks$hope_ratio)
+summary(modks$hope_ratio)
+
+modks$hope_slope = as.numeric(modks$hope_slope)
+summary(modks$hope_slope)
+
+str(modks)
+
+modks$launched_year = as.factor( modks$launched_year )
+modks$state = as.factor( modks$state)
+
+##################################################################################
+
+```
+
+```{r}
+########################## Get data from 2012 - 2018 and only states = to failed and successful
+
+library(sqldf)
+
+
+# tried many different ways to combine the sql select but it would always bring back all of the dates so had to separate out
+
+kstest = sqldf( "select * from modks where launched_year > 2011")
+
+ks2012_2018 = sqldf( "SELECT * FROM kstest
+                     WHERE state = 'failed' 
+                        OR state = 'successful'")
+
+
+summary(kstest$launched_year)
+
+
+str(ks2012_2018)
+summary(ks2012_2018)
+
+# there's one row with NAs that is giving an issue
+
+ks2012_2018 = ks2012_2018[complete.cases(ks2012_2018),]
+summary(ks2012_2018)
+
+
+summary(ks2012_2018$launched_year)
+summary(ks2012_2018$state)
+
+ks2012_2018$state = factor(ks2012_2018$state) # have to do this or r thinks there are still 5 levels
+summary(ks2012_2018$state)
+
+ks2012_2018$launched_year = factor(ks2012_2018$launched_year)
+summary(ks2012_2018$launched_year)
+
+ks2012_2018$main_category = factor(ks2012_2018$main_category)
+
+
+
+```
+
+```{r}
+
+############################** there will be correlated predictors since we did feature engineering, lets remove  them.**
+library(corrplot)
+
+# remove response fromthe data 
+preds = ks2012_2018[ , c(-3)]
+summary(preds)
+
+response = ks2012_2018[, c(3)]
+summary(response)
+
+correlations <- cor(preds[ , c( 3:12)]) # don't want characters so only use numeric preds
+corrplot(correlations, order = "hclust", method = "shade")
+
+hc = findCorrelation(correlations, cutoff=0.9)
+hc = sort(hc)
+
+print(hc) # 1 4 7 but must remember this thinks col 3 is 1, so it wants us to remove 3,6,9, from the original data so backers,usd_short, hope_ratio
+
+predsReduced = preds[ , c(-3, -6, -9)]
+summary(predsReduced)
+str(predsReduced)
+
+##############################################################################
+```
+
+
+
+
+```{r}
+
+############# Split Data into Training/Test & Validation ###################
+set.seed(123)
+train <- sample(1:nrow(predsReduced),nrow(predsReduced)*.7,rep=FALSE)
+test <- -train
+
+training_preds = predsReduced[train,]
+testing_preds = predsReduced[test,]
+summary(training_preds)
+nrow( training_preds)
+
+training_y = response[train]
+testing_y = response[test]
+summary(training_y )
+nrow(testing_y)
+############################################################################
+
+```
+
+
+
+
+** kNN cv with k = 10 and repeated 5 times **
+```{r}
+set.seed(123)
+
+# this is taking way toolong with the entire training set, so taking a smaller random sample to do the tuning on then will run actual model on entire training set.
+
+traink <- sample(1:nrow(predsReduced),10000 ,rep=FALSE)
+testk <- -traink
+
+kpreds = data.frame(predsReduced[traink,])
+kresponse = response[traink]
+
+summary(kpreds)
+summary(kresponse)
+
+ctrl <- trainControl(method="repeatedcv",number = 10, repeats = 5) #,classProbs=TRUE,summaryFunction = twoClassSummary)
+#knnFit <- train( kresponse ~., data = kpreds, method = "knn", trControl = ctrl, preProcess = c("center","scale"))
+
+# keep getting this error now Error in `[.data.frame`(data, , all.vars(Terms), drop = FALSE) : undefined columns selected so going to try to add the response back into the data frame
+
+totalData = kpreds
+summary(totalData)
+totalData$response = kresponse
+summary(totalData)
+
+ctrl <- trainControl(method="repeatedcv",number = 10, repeats = 10) #,classProbs=TRUE,summaryFunction = twoClassSummary)
+knnFit <- train( response ~., data = totalData, method = "knn", trControl = ctrl, preProcess = c("center","scale"))
+
+knnFit
+
+
+
+```
+** do training the whole training set
+```{r}
+
+#In cases where the model tuning values are known, train can be used to fit the model to the entire training set without any resampling or parameter tuning. Using the method = "none" option in   we found optimal k = 5
+
+# for some reason this function doesn't like the response being outside of the dataframe so need to add back 
+
+
+# going to use knn3 instead b/c wasn't sure how to predict with this other response
+
+knnFinal = knn3(training_preds, training_y, k = 5, prob = TRUE)
+knnFinal
+
+
+#knn_pred_y = knn(training_preds[-1], testing_preds[-1], training_y, k = 5)
+#table(knn_pred_y, testing_y)
+
+
+```
+
+** Try Knn on smaller projects only ( under 50000 ) **
+```{r}
+ksSmallProjects = sqldf( " SELECT * FROM ks2012_2018 
+                         WHERE usd_goal_real < 50000 ")
+
+#summary(ksSmallProjects)
+
+ks3 = ksSmallProjects[ , c( 1,3,6,8)]
+#summary(ks3)
+str(ks3)
+
+dmy <- dummyVars(" ~ main_category", data = ks3)
+ks3dummy <- data.frame(predict(dmy, newdata = ks3))
+#summary(ks3dummy)
+
+ks3dummy$state= ks3$state
+ks3dummy$usd_goal_real = ks3$usd_goal_real
+ks3dummy$duration = ks3$duration
+
+#
+#summary(ks3dummy)
+set.seed(123)
+train <- sample(1:nrow(ks3dummy),nrow(ks3dummy)*.7,rep=FALSE)
+test <- -train
+
+############## preprocessed  values ###########################
+
+preProcValues <- preProcess(ks3dummy, method = c("center", "scale"))
+transformed <- predict(preProcValues, ks3dummy)
+#summary(transformed)
+
+trans_trainks3_pred = transformed[train,-16 ]
+trans_testks3_pred = transformed[test, -16 ]
+
+trans_traink3_y = transformed$state[train]
+trans_testks3_y = transformed$state[test]
+
+
+############## regular values ###################
+
+trainks3_pred = ks3dummy[train,-16 ]
+testks3_pred = ks3dummy[test, -16 ]
+
+traink3_y = ks3dummy$state[train]
+testks3_y = ks3dummy$state[test]
+
+ks3trainAlt = ks3dummy[train, ]
+ks3testAlt = ks3dummy[test, ]
+#summary(ks3testAlt)
+
+####################################################
+
+# this takes forever so just taking a sample of the training set to get optimal k
+traink <- sample(1:nrow(ks3dummy),10000 ,rep=FALSE)
+fitData = ks3dummy[traink,]
+
+
+
+ctrl <- trainControl(method="repeatedcv",number = 10, repeats = 10)
+knnks3Fit <- train( state ~., data = fitData, method = "knn", trControl = ctrl, preProcess = c("center","scale"))
+
+knnks3Fit2 <- train( state ~., data = fitData, method = "knn", trControl = ctrl)
+knnks3Fit2 
+
+
+
+### preprocessing gives an accuracy boost of 3%
+# now run the actual predictions
+
+##Error in knn(trainks3_pred, testks3_pred, traink3_y, k = 9) : too many ties in knn
+#knn_pred_y = knn(trainks3_pred, testks3_pred, traink3_y, k = 9)
+#table(knn_pred_y, testing_y)
+
+#Error in knn(trainks3_pred, testks3_pred, traink3_y, k = 11) :  too many ties in knn
+#knn_pred_y = knn(trainks3_pred, testks3_pred, traink3_y, k = 11)
+#table(knn_pred_y, testing_y)
+
+################## knn prediction with transformed data ##########################
+##Error in knn(trans_trainks3_pred, trans_testks3_pred, trans_traink3_y,  : too many ties in knn
+#knn_pred_y = knn(trans_trainks3_pred, trans_testks3_pred, trans_traink3_y, k = 9 )
+
+###### try with use.all = FALSE #############
+#Error in knn(trans_trainks3_pred, trans_testks3_pred, trans_traink3_y,  : too many ties in knn
+#knn_pred_y = knn(trans_trainks3_pred, trans_testks3_pred, trans_traink3_y, k = 9, use.all = FALSE )
+#
+#knn_pred_y = knn(trans_trainks3_pred, trans_testks3_pred, trans_traink3_y, k = 17, use.all = FALSE )
+
+#knn_pred_y = knn(trans_trainks3_pred, trans_testks3_pred, trans_traink3_y, k = 13,use.all = FALSE )
+
+#################### none of the above are working so trying the train model again 
+
+##########################
+#summary(ks3trainAlt)
+ctrl <- trainControl(method="repeatedcv",number = 10, repeats = 10)
+knnks4Fit <- train( state ~., data = ks3trainAlt, method = "knn", trControl = ctrl, preProcess = c("center","scale"))
+
+names(knnks4Fit)
+
+predictedK = predict( knnks4Fit$finalModel, newdata = ks3testAlt[, -16],  type = c( "class"))
+
+table(predictedK, ks3testAlt[, 16])
+
+
+
+
+```
+
+```{r}
+########################going to try with just a few categories and from 2015 #########
+
+#ks_2015 = sqldf( " select * from ks2012_2018 
+#                  where launched_year > 2014
+# AND main_category like 'Design' 
+#  OR main_category like 'Technology'")
+library(sqldf)
+
+year = sqldf("select * from ks2012_2018 
+             where launched_year > 2014")
+
+ks_2015 = sqldf( "select * from year 
+                 where main_category like 'Design' 
+                 or  main_category like 'Technology' ")
+
+
+summary(ks_2015)
+
+summary(ks_2015$launched_year)
+
+####################### split data  into training / testing sets
+
+set.seed(123)
+train <- sample(1:nrow(ks_2015),nrow(ks_2015)*.7,rep=FALSE)
+test <- -train
+
+ks_2015_training_preds = ks_2015[train, c(3,8,9,10,11,12)] # using only duration and engineered  columns
+ks_2015_testing_preds = ks_2015[test, c(3,8,9,10,11,12)]
+
+ks_2015_training_y = ks_2015$state[train]
+ks_2015_testing_y = ks_2015$state[test]
+
+summary(ks_2015_testing_preds)
+
+
+####################### run some models from caret ###################
+library(fastAdaboost)
+library(caret)
+
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+
+#adaBoost = train(state ~ ., data = ks_2015_training_preds, 
+#                 method = "adaboost", 
+ #                trControl = fitControl,
+ #                verbose = FALSE, 
+ #                preProcess = c("center","scale"))
+
+#adaBoost
+#### this gives accuracy of 1 b/c the answer of fail or pass is in our engineered columns
+
+#summary(ks_2015)
+
+train_dur_goal = ks_2015[train, c(3,6,8)]
+test_dur_goal = ks_2015[test, c(3,6,8)]
+nrow(test_dur_goal)
+nrow(train_dur_goal)
+train_dur_goal_y = ks_2015$state[train]
+test_dur_goal_y = ks_2015$state[test]
+
+#install.packages('doParallel')
+######## not sure if this will work but just found it for parallel
+#library(doParallel)
+#cl <- makePSOCKcluster(5)
+#registerDoParallel(cl)
+
+################### this took way too long again
+
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 5)
+
+adaBoost = train(state ~ ., data = train_dur_goal, 
+                 method = "adaboost", 
+              #   trControl = fitControl,
+                 verbose = FALSE, 
+                 preProcess = c("center","scale"))
+
+adaBoost
+
+
+```
+
+```{r}
+
+library(tree)
+library(ISLR)
+library(caret)
+
+tree.ks=tree(state~.  ,subset=train, data =train_dur_goal)
+tree.pred=predict(tree.ks,test_dur_goal,type="class")
+table(tree.pred,test_dur_goal_y)
+
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+
+tree.fit = train(state~., data = train_dur_goal, method = "rpart2", trControl = fitControl)
+
+tree.fit
+
+names(tree.fit)
+
+tree.pred2 = predict( tree.fit$finalModel, newdata = test_dur_goal,  type = c( "class"))
+
+table(tree.pred2 , test_dur_goal_y)
+
+```
+
+```{r svm}
+
+library(e1071)
+library(ISLR)
+set.seed(1)
+
+subset = sample(sample(1:nrow(train_dur_goal),1000 ,rep=FALSE))
+subsetTrain = train_dur_goal[subset, ]
+
+tune.outL=tune(svm,state~.,data=subsetTrain,kernel="linear",
+              ranges=list(cost=c(0.001, 0.01, 0.1, 1,5,10,100)))
+summary(tune.outL)
+#best cost=5
+
+
+tune.outP=tune(svm,state~.,data=subsetTrain,kernel="polynomial",
+              ranges=list(cost=c(0.001, 0.01, 0.1, 1,5,10),
+              degree=c(2,3,4)))
+summary(tune.outP)
+#cost=10,degree=3
+
+set.seed(1)
+tune.outR=tune(svm,state~.,data=subsetTrain,kernel="radial",
+              ranges=list(cost=c(0.001, 0.01, 0.1, 1,5,10),
+                          gamma=c(.01,.1,1,5)))
+summary(tune.outR)
+
+
+svm.radial=svm(state~.,data=train_dur_goal,kernel="linear",
+               cost=.001)
+
+svm.radial
+
+predict.svm = predict( svm.radial , test_dur_goal,type="class")
+table( predict.svm ,test_dur_goal_y )
+```
+
+```{r}
+library(randomForest)
+############random forest
+fitControl <- trainControl(## 10-fold CV
+                           method = "repeatedcv",
+                           number = 10,
+                           ## repeated ten times
+                           repeats = 10)
+
+rf.fit = train(state~., data = subsetTrain, method = "cforest", trControl = fitControl)
+rf.fit
+
+ks.rf <- randomForest(state~., data=train_dur_goal)
+ks.rf=predict(ks.rf, newdata=test_dur_goal,type="class")
+
+table( ks.rf , test_dur_goal_y )
+```
+
